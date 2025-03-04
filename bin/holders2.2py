@@ -1,0 +1,54 @@
+import re
+from playwright.async_api import async_playwright
+
+BASE_URL = "https://solscan.io/token/"
+
+async def get_holders_count(token_address):
+    """Fetch holders count from Solscan asynchronously."""
+    token_url = f"{BASE_URL}{token_address}#holders"
+
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.goto(token_url, timeout=60000)
+
+            # Wait for page to fully load
+            await page.wait_for_timeout(5000)
+
+            try:
+                # Extract holders count
+                element = await page.wait_for_selector(
+                    "//html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div[2]/div[2]/div[2]/div/div[5]/div/div/div[1]/div/div/div",
+                    timeout=10000
+                )
+                holders_text = await element.inner_text()
+
+                # ✅ Extract only the number using regex
+                match = re.search(r"\d+", holders_text)  # Find first number in text
+                if match:
+                    holders_count = int(match.group(0))  # Convert to integer
+                    print(f"✅ Holders Count for {token_address}: {holders_count}")
+                else:
+                    holders_count = "Not Available"  # Fallback if no number found
+                    print(f"⚠️ Holders Count for {token_address} is Not Available")
+
+            except Exception as e:
+                print(f"⚠️ Error extracting holders for {token_address}: {e}")
+                holders_count = "Not Available"
+
+            await browser.close()
+            return holders_count  # ✅ Return clean holders count
+
+    except Exception as e:
+        print(f"❌ Error opening Playwright browser: {e}")
+        return "Not Available"
+
+# ✅ Example usage (must be run inside an async function)
+import asyncio
+async def main():
+    token = "B8UruRxFvAoTZoSg7waHFkGJ96nHPso5VbEkVAzapump"
+    holders = await get_holders_count(token)
+    print(f"Final Holders Count: {holders}")
+
+asyncio.run(main())
