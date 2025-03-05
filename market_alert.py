@@ -95,7 +95,7 @@ async def track_graduating_tokens():
                                 liquidity_status, trade, degen, new_ath, token_address
                             ))
 
-                        elif new_marketCap < 53000:
+                        elif new_marketCap < 20000:
                             logger.warning(f"⚠️ {token_address} dropped below 55K! Removing from graduating_db.")
                             await delete_graduating_token(token_address)  # ✅ Ensure it's awaited
 

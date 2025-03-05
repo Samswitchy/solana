@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from modules.database import init_db, get_all_tokens, initialize_database,fetch_graduating_tokens
+from modules.database import init_db, get_all_tokens,fetch_graduating_tokens
 from telegram_client import run_telegram_client
 #from market_alert import track_market
 from market_alert import track_market, track_multiple_tokens, track_graduating_tokens
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
 async def main():
     init_db()
-    await initialize_database()  # ✅ Ensure table exists
+    #await initialize_database()  # ✅ Ensure table exists
     #asyncio.run(initialize_db())
     tokens = await fetch_graduating_tokens()
     #await client.start()  # Ensure Telegram client is started properly

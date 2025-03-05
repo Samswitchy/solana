@@ -3,7 +3,7 @@ import aiosqlite
 import asyncio
 import datetime
 import logging
-from modules.config import DATABASE_NAME, GRADUATING
+from modules.config import DATABASE_NAME
 
 from modules.tgalert import send_telegram_alert  # Import the function from tgalert module
 
@@ -45,7 +45,7 @@ def init_db():
 
 async def enable_wal_mode():
     """Enable WAL mode to prevent database locking issues."""
-    async with aiosqlite.connect(GRADUATING) as conn:
+    async with aiosqlite.connect(DATABASE_NAME) as conn:
         await conn.execute("PRAGMA journal_mode=WAL;")
         await conn.commit()
     logger.info("✅ WAL mode enabled for graduating_tokens database.")
@@ -102,7 +102,7 @@ async def batch_update_graduating_tokens(updates):
         logger.error(f"❌ Batch update error: {e}")
 
 #-----------------------------------------------------
-"""
+
 async def delete_graduating_token(token_address):
      #Delete a token from the graduating status in tokens.db.
     try:
@@ -113,6 +113,7 @@ async def delete_graduating_token(token_address):
         logger.info(f"🗑️ Deleted {token_address} from tokens.db")
     except Exception as e:
         logger.error(f"❌ Error deleting token {token_address}: {e}")
+        """
 """
 #----------------------------------------------------
 #Below is the updated code for the file database_name
