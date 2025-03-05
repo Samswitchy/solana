@@ -22,54 +22,69 @@ from modules.market_data import (
  ) # ✅ Import holders & volume functions
 #from trade.bmain import buy_tokens_if_needed
 
-
 async def track_market(token_address):
-    """Fetch MarketCap, holders, and volume every 60 seconds and update the database."""
+    """Fetch MarketCap, holders, and volume for multiple tokens in one API call and update separately."""
     while True:
-        marketCap = await get_token_data(token_address)
-        volume = await get_volume_data(token_address)
-        liquidity = await get_liquidity_data(token_address)
+        #token_address = await get_all_tokens()  # ✅ Fetch tokens from database
 
-        if marketCap != "Not Available":
-            marketCap = float(marketCap)
+        # ✅ Batch API Calls - Fetch Data for ALL tokens at once
+        marketCaps = await get_token_data(token_address)  # Returns
+        volumes = await get_volume_data(token_address)  # Returns {token: volume}
+        liquidities = await get_liquidity_data(token_address)  # Returns {token: liquidity}
 
-           
-            # Ignore tokens below 30K
-            if marketCap < 30000:
-                 # Remove the logging statement or comment it out
-                await asyncio.sleep(40)
-                continue  # Skip tracking this token
+        tasks = []  # Store async tasks for concurrent execution
 
-            status= "Active"
+        for token in token_address:
+            # Get individual token data
+            marketCap = marketCaps.get(token, "Not Available")
+            volume = volumes.get(token, 0)
+            liquidity = liquidities.get(token, 0)
 
-            logger.info(f"💰 {token_address} - MarketCap: ${format_number(marketCap)}, Volume: {format_number(volume)}")
-            
-            await market_to_db(token_address, marketCap, volume, liquidity)
+            # ✅ Each token updates separately in its own task
+            tasks.append(asyncio.create_task(update_token(token, marketCap, volume, liquidity)))
 
+        # ✅ Run all token updates in parallel
+        await asyncio.gather(*tasks)
 
-            if marketCap >= 57000:
-                status = "Graduating"
-                logger.info(f"🎓 {token_address} has crossed 57K! Moving to graduating_db")
-                await move_to_graduating_db(token_address, marketCap, status)  # ✅ Move to graduating DB
-                #await market_to_db(token_address, marketCap, volume, liquidity)
-                
+        await asyncio.sleep(20)  # Re-check every 40 seconds
 
-                # 🔥 Apply Degen Classification
-                degen_category = await classify_degen(token_address)
-                logger.info(f"🛠️ {token_address} classified as: {degen_category}")  # ✅ Log classification
-            if liquidity < 10_000:
-                print(f"⚠️ Low Liquidity: ${format_number(liquidity)}")
-            else:
-                print(f"✅ Total Liquidity: ${format_number(liquidity)}")
-        await asyncio.sleep(40)  # Check every 40 seconds
+async def update_token(token_address, marketCap, volume, liquidity):
+    """Process and update a single token's data separately."""
+    if marketCap == "Not Available":
+        return  
 
+    marketCap = float(marketCap)
+
+    if marketCap < 30000:
+        return  # Skip this token
+
+    status = "Active"
+    logger.info(f"💰 {token_address} - MarketCap: ${format_number(marketCap)}, Volume: {format_number(volume)}")
+
+    await market_to_db(token_address, marketCap, volume, liquidity)  # ✅ Save to DB separately
+
+    if marketCap >= 57000:
+        status = "Graduating"
+        logger.info(f"🎓 {token_address} has crossed 57K! Moving to graduating_db")
+        await move_to_graduating_db(token_address, marketCap, status)
+
+        degen_category = await classify_degen(token_address)
+        logger.info(f"🛠️ {token_address} classified as: {degen_category}")
+
+    if liquidity < 10_000:
+        print(f"⚠️ {token_address} - Low Liquidity: ${format_number(liquidity)}")
+    else:
+        print(f"✅ {token_address} - Total Liquidity: ${format_number(liquidity)}")
+
+# Example usage:
+# asyncio.run(track_tokens(["TOKEN1", "TOKEN2", "TOKEN3"]))
+#-----------------------------------------------------------------------------------
 
 async def track_graduating_tokens():
     """Track tokens already in graduating.db and update their market cap."""
     while True:
         try:
             tokens = await fetch_graduating_tokens()  # ✅ Ensure it returns prev_ath & prev_marketCap
-            #logger.info(f" here Fetched {len(tokens)} graduating tokens: {tokens}")
 
             if tokens:
                 updates = []
@@ -114,7 +129,9 @@ async def track_graduating_tokens():
                             status = "Inactive"
                             logger.warning(f"⚠️ {token_address}Token below 25K! Inactive in Status.")
                             await inactive_to_db(token_address,status)  # ✅ Ensure it's awaited
-                    
+                        
+                            #
+
                 if updates:
                     try:
                         await batch_update_tokens(updates)  # ✅ Awaiting the update

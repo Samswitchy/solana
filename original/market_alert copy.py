@@ -29,6 +29,7 @@ async def track_market(token_address):
         marketCap = await get_token_data(token_address)
         volume = await get_volume_data(token_address)
         liquidity = await get_liquidity_data(token_address)
+        print(marketCap)
 
         if marketCap != "Not Available":
             marketCap = float(marketCap)
@@ -49,7 +50,7 @@ async def track_market(token_address):
 
             if marketCap >= 57000:
                 status = "Graduating"
-                logger.info(f"🎓 {token_address} has crossed 57K! Moving to graduating_db")
+                logger.info(f"🎓 {token_address} has crossed 60K! Moving to graduating_db")
                 await move_to_graduating_db(token_address, marketCap, status)  # ✅ Move to graduating DB
                 #await market_to_db(token_address, marketCap, volume, liquidity)
                 
@@ -69,7 +70,6 @@ async def track_graduating_tokens():
     while True:
         try:
             tokens = await fetch_graduating_tokens()  # ✅ Ensure it returns prev_ath & prev_marketCap
-            #logger.info(f" here Fetched {len(tokens)} graduating tokens: {tokens}")
 
             if tokens:
                 updates = []
@@ -114,7 +114,9 @@ async def track_graduating_tokens():
                             status = "Inactive"
                             logger.warning(f"⚠️ {token_address}Token below 25K! Inactive in Status.")
                             await inactive_to_db(token_address,status)  # ✅ Ensure it's awaited
-                    
+                        
+                            #
+
                 if updates:
                     try:
                         await batch_update_tokens(updates)  # ✅ Awaiting the update

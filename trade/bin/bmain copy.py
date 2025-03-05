@@ -1,6 +1,6 @@
 import time
 import traceback
-from db import fetch_info, save_bought_token
+from trade.core.db import fetch_info, save_bought_token
 from marketcap import get_token_marketcap
 from abuy import buy_token
  

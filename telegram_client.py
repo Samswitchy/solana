@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from telethon import TelegramClient, events
-from modules.config import API_ID, API_HASH, PHONE_NUMBER, CHANNEL_USERNAME
+from modules.config import API_ID, API_HASH, PHONE_NUMBER, CHANNEL_USERNAME , TELEGRAM_DATA
 from modules.core.extractor import extract_token_name, extract_token_address, extract_x_link
 from modules.market_data import get_token_data
 from modules.database import save_to_db
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
-client = TelegramClient("telegramData_session", API_ID, API_HASH)
+client = TelegramClient(TELEGRAM_DATA, API_ID, API_HASH)
 
 async def process_message(message_text):
     try:

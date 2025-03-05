@@ -3,7 +3,7 @@ import datetime
 import logging
 from modules.database import get_all_tokens, market_to_db, get_market_caps_from_db
 from modules.market_data import get_token_data
-import
+
 
 def calculate_x_gain(old_price, new_price):
     """Calculate how many X the price has increased."""
@@ -18,7 +18,8 @@ async def fetch_market_caps():
     for token in tokens:
         token_address = token["token_address"]  # ✅ Extract token address
 
-        old_price, new_price, initial_date, updated_at = get_market_caps_from_db(token_address)
+        old_price, new_price, initial_date, updated_at = await get_market_caps_from_db(token_address)
+
 
         if old_price and new_price:
             result = calculate_x_gain(old_price, new_price)
@@ -42,3 +43,4 @@ async def fetch_market_caps():
 
 # ✅ Properly run the async function
 asyncio.run(fetch_market_caps())
+

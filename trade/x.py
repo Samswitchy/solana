@@ -3,7 +3,7 @@ import datetime
 import aiosqlite
 import asyncio
 import logging
-from db import get_market_caps_from_db, get_all_tokens
+from trade.core.db import get_market_caps_from_db, get_all_tokens
 from marketcap import get_token_data
 
 def calculate_x_gain(old_price, new_price):

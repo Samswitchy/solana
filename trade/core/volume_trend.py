@@ -1,5 +1,5 @@
 import asyncio
-from modules.market_data import get_trending_data  # ✅ Import data fetch function
+from core.market_data import get_trending_data  # ✅ Import data fetch function
 
 async def get_volume_trend(token_address):
     """Improved volume trend analysis with proper number extraction."""

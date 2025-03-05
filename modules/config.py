@@ -4,7 +4,9 @@ API_ID = "19780264"
 API_HASH = "cbb43586ab6e93107ac5cc6fd741c869"
 PHONE_NUMBER = "+2348116267294"
 CHANNEL_USERNAME = "pfultimate"
+
 #CHANNEL_USERNAME = "pfultimate"
+
 
 
 """ THIS IS PUMPFUN CODE TO BUY TOKEN 
@@ -48,3 +50,7 @@ if not os.path.exists(FOLDER_PATH):
 DATABASE_NAME = os.path.join(FOLDER_PATH, "tokens.db")
 TRADE = os.path.join(FOLDER_PATH, "trades.db")
 GRADUATING = os.path.join(FOLDER_PATH, "graduating.db")
+
+TELEGRAM_DATA = os.path.join(FOLDER_PATH, "telegramData_session")
+
+ 

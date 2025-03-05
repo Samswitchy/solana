@@ -2,7 +2,7 @@ import sys
 import os
 from collections import defaultdict
 
-from modules.market_data import get_trending_data  # ✅ Updated import
+from core.market_data import get_trending_data  # ✅ Updated import
 
 async def calculate_trending_score(token_address):
     """Calculate trending score based on token data."""

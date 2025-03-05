@@ -4,19 +4,18 @@ import asyncio
 import requests
 import sys
 import os
-# Get the project root directory (two levels up)
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+# Go two levels up if needed
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
-# Add it to sys.path if not already included
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
 # Now, we can import config correctly
-from modules.config import GRADUATING, TRADE
-from config import HELIUS_RPC_URL, PRIVATE_KEY
+from modules.config import DATABASE_NAME, TRADE
+from trade.core.config import HELIUS_RPC_URL, PRIVATE_KEY
 
 #DB_PATH = "graduating.db"
-DB_PATH = GRADUATING
+DB_PATH = DATABASE_NAME
 
 def create_table():
     """Ensures the database has the correct structure."""
@@ -48,9 +47,9 @@ create_table()
 
 def get_mint_address():
     try:
-        conn = sqlite3.connect(GRADUATING)
+        conn = sqlite3.connect(DATABASE_NAME)
         cursor = conn.cursor()
-        cursor.execute("SELECT token_address FROM graduating_tokens")
+        cursor.execute("SELECT token_address FROM tokens  WHERE status = 'Graduating'")
         result = cursor.fetchone()
         conn.close()
 
@@ -83,9 +82,9 @@ def save_bought_token(mint, amount, tx_signature, price, market_cap):
 def fetch_info():
     """Fetches all tokens with their pot_token and marketcap from the graduating database."""
     try:
-        conn = sqlite3.connect(GRADUATING)
+        conn = sqlite3.connect(DATABASE_NAME)
         cursor = conn.cursor()
-        cursor.execute("SELECT token_address, pot_token, marketcap, trade FROM graduating_tokens")
+        cursor.execute("SELECT token_address, pot_token, marketcap, trade FROM tokens WHERE status = 'Graduating' ")
         results = cursor.fetchall()  # ✅ Fetch all records
         conn.close()
         return results  # ✅ List of (TOKEN_MINT, POT_TOKEN, MARKETCAP) tuples

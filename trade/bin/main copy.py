@@ -1,5 +1,5 @@
 #from modules.db import get_mint_address, save_bought_token
-from db import get_mint_address, save_bought_token
+from trade.core.db import get_mint_address, save_bought_token
 from marketcap import get_token_marketcap
 from abuy import buy_token
 

@@ -4,8 +4,9 @@ from solders.keypair import Keypair
 from solana.rpc.api import Client
 from solders.transaction import Transaction
 from solana.rpc.types import TxOpts
-from config import HELIUS_RPC_URL, PRIVATE_KEY
-from db import get_token_balance
+
+from core.config import HELIUS_RPC_URL, PRIVATE_KEY
+from core.db import get_token_balance
 
 def sell_token(input_mint: str, output_mint: str = "So11111111111111111111111111111111111111112", sell_amount: float = None):
     """

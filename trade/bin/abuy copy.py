@@ -5,7 +5,7 @@ from solders.pubkey import Pubkey
 from solana.rpc.api import Client
 from solders.transaction import Transaction
 from solana.rpc.types import TxOpts
-from config import HELIUS_RPC_URL, PRIVATE_KEY
+from trade.core.config import HELIUS_RPC_URL, PRIVATE_KEY
 
 def buy_token(input_mint: str, output_mint: str, sol_amount: float = 0.01, priority_fee: float = 0.0007):
     """

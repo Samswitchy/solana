@@ -1,6 +1,6 @@
 import asyncio
 import os, sys
-from db import fetch_info  # ✅ Import the acleasync function
+from core.db import fetch_info  # ✅ Import the acleasync function
 # Get the project root directory (two levels up)
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -8,8 +8,8 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
-from modules.trending_score import calculate_trending_score  # ✅ Import correctly
-from modules.volume_trend import get_volume_trend           # ✅ New volume trend module
+from core.trending_score import calculate_trending_score  # ✅ Import correctly
+from core.volume_trend import get_volume_trend           # ✅ New volume trend module
 
 async def main():
     # ✅ Fetch token addresses from database

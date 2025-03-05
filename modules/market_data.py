@@ -8,7 +8,6 @@ from modules.holders2 import get_holders_count  # ✅ Import function from holde
 
 logger = logging.getLogger(__name__)
 
-
 semaphore = asyncio.Semaphore(2)  # Limit concurrent API calls
 cache = {}  # Cache to store API responses
 
@@ -33,78 +32,54 @@ async def fetch_json(url, retries=4, delay=2):
         return None
 
 async def get_token_data(token_address):
-    """Fetch market cap data with caching."""
-    if token_address in cache and time.time() - cache[token_address]["timestamp"] < 60:
-       # logger.info(f"🟢 Using cached marketCap for {token_address}: {cache[token_address]}")
-        return cache[token_address].get("marketCap", 0)  # Safer cache access
-
+    """Fetch market cap data from DexScreener API asynchronously."""
     url = f"https://api.dexscreener.com/latest/dex/tokens/{token_address}"
     data = await fetch_json(url)
-
-    #logger.info(f"🔍 API Response for {token_address}: {data}")  # Log response
-
     if data and "pairs" in data and isinstance(data["pairs"], list) and len(data["pairs"]) > 0:
-        market_cap = float(data["pairs"][0].get("marketCap", 0))
-        cache[token_address] = {"marketCap": market_cap, "timestamp": time.time()}
-        return market_cap
-
-    logger.warning(f"⚠️ No valid marketCap data found for {token_address}.")
-    return 0  # Explicitly return 0 instead of an unexpected value
-
+        pair = data["pairs"][0]
+        return float(pair.get("marketCap", 0))
+    return 0
 
 async def get_volume_data(token_address):
     """Fetch 24h trading volume across all DEX pairs asynchronously."""
     url = f"https://api.dexscreener.com/latest/dex/tokens/{token_address}"
     data = await fetch_json(url)
+    total_volume = 0
     
     if data and "pairs" in data and isinstance(data["pairs"], list):
-        total_volume = sum(
-            float(pair.get("volume", {}).get("h24", 0))
-            for pair in data["pairs"]
-            if float(pair.get("liquidity", {}).get("usd", 0)) > 500
-        )
-        return total_volume if total_volume > 0 else 0
-    return 0
+        for pair in data["pairs"]:
+            volume = float(pair.get("volume", {}).get("h24", 0))
+            liquidity = float(pair.get("liquidity", {}).get("usd", 0))
+            if volume > 0 and liquidity > 500:
+                total_volume += volume
+    
+    return total_volume if total_volume > 0 else 0
 
 async def get_liquidity_data(token_address):
     """Fetch total liquidity across all DEX pairs for a given token asynchronously."""
     url = f"https://api.dexscreener.com/latest/dex/tokens/{token_address}"
     data = await fetch_json(url)
+    total_liquidity = 0
 
     if data and "pairs" in data and isinstance(data["pairs"], list):
-        total_liquidity = sum(
-            float(pair.get("liquidity", {}).get("usd", 0))
-            for pair in data["pairs"]
-            if float(pair.get("liquidity", {}).get("usd", 0)) > 500
-        )
-        return total_liquidity if total_liquidity > 0 else 0
-    return 0
-
+        for pair in data["pairs"]:
+            liquidity = float(pair.get("liquidity", {}).get("usd", 0))
+            if liquidity > 500:
+                total_liquidity += liquidity
+    
+    return total_liquidity if total_liquidity > 0 else 0
 
 async def get_holders_data():
-    """Fetch holders count for all tokens and update the database asynchronously."""
-    tokens = get_all_tokens()  # Fetch all token addresses
+    """Fetch holders count for all tokens and update the database."""
+    tokens = get_all_tokens()
 
     for token in tokens:
-        holders_count = await get_holders_count(token["token_address"])  # ✅ Now async
+        holders_count = await get_holders_count(token["token_address"])
         logger.info(f"✅ Extracted Holders Count: {holders_count}")
+        print(holders_count)
 
         if holders_count and holders_count != "Not Available":
             logger.info(f"👥 Holders Count Updated for {token['token_address']}: {holders_count}")
-            await holders_to_db(token["token_address"], holders_count)  # ✅ Now async
+            await holders_to_db(token["token_address"], holders_count)
         else:
             logger.warning(f"⚠️ Skipping update for {token['token_address']}, holders count unavailable.")
-
-
-async def get_trending_data(token_address):
-    """Fetch full trending data with caching."""
-    if token_address in cache and time.time() - cache[token_address]["timestamp"] < 60:
-        return cache[token_address]["data"]  # Return full cached data
-
-    url = f"https://api.dexscreener.com/latest/dex/tokens/{token_address}"
-    data = await fetch_json(url)
-
-    if data and "pairs" in data and isinstance(data["pairs"], list) and len(data["pairs"]) > 0:
-        cache[token_address] = {"data": data, "timestamp": time.time()}
-        return data  # ✅ Now returning full token data
-    return None
