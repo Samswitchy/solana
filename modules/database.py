@@ -53,83 +53,67 @@ async def enable_wal_mode():
 #--------------------------------------------------------
 
 async def move_to_graduating_db(token_address, marketCap):
-    #from modules.volume_trend import get_volume_trend 
-    """Move token to graduating DB and set pot_token if market cap > 140K."""
-    #pot_token = "YES" if marketCap >= 140000 else "NO"
-    #pot_token = 55000 if marketCap >= 55000 else "NO"
-      # Check if market cap is within the range
+    """Move token to graduating status and set pot_token if market cap is in range."""
     if 55000 <= marketCap <= 70000:
         pot_token = marketCap  # Set pot_token to marketCap
         message = f"Token: {token_address}\nMarket Cap: {marketCap}\nPot Token: {pot_token}"
-        send_telegram_alert(message)  # Send the alert only when in range
+        send_telegram_alert(message)  # Send alert
 
-    async with aiosqlite.connect(GRADUATING) as conn:
+    async with aiosqlite.connect(DATABASE_NAME) as conn:
         await conn.execute("""
-            INSERT INTO graduating_tokens (token_address, marketCap, pot_token) 
-            VALUES (?, ?, ?)
-            ON CONFLICT(token_address) DO UPDATE SET 
-            marketCap = excluded.marketCap,
-            pot_token = excluded.pot_token;
-            
-        """, (token_address, marketCap, pot_token))
+            UPDATE tokens 
+            SET marketCap = ?, pot_token = ?
+            WHERE token_address = ?
+        """, (marketCap, pot_token, token_address))
         await conn.commit()
     
-    await asyncio.sleep(0)  # ✅ Prevents deadlocks by allowing other tasks to run
-
-    logger.info(f"✅ {token_address} saved/updated in graduating_db with marketCap: {marketCap}")
-
+    logger.info(f"✅ {token_address} updated in tokens.db with MarketCap: {marketCap}")
 
 async def fetch_graduating_tokens():
-    """Fetch token addresses, market caps, and ATH from graduating.db asynchronously."""
-    async with aiosqlite.connect(GRADUATING) as conn:
-        cursor = await conn.execute("SELECT token_address, marketCap, ath FROM graduating_tokens")
+    """Fetch graduating tokens with market caps and ATH from tokens.db."""
+    async with aiosqlite.connect(DATABASE_NAME) as conn:
+        cursor = await conn.execute("SELECT token_address, marketCap, ath FROM tokens WHERE status = 'graduating'")
         tokens = await cursor.fetchall()
 
-    #logger.info(f"📊 Raw Database Output: {tokens}")  # ✅ Log raw data
-
-    # ✅ Ensure 'marketCap' and 'ath' are never None
+    # Ensure 'marketCap' and 'ath' are never None
     formatted_tokens = [
         (row[0], row[1] if row[1] is not None else 0, row[2] if row[2] is not None else 0)
         for row in tokens
     ]
 
-  #  logger.info(f"📊 Processed Tokens: {formatted_tokens}")  # ✅ Log cleaned data
     return formatted_tokens
 
-
 async def batch_update_graduating_tokens(updates):
-    """Batch update market cap, volume, and pot_token for graduating tokens."""
-
+    """Batch update market cap, volume, pot_token, and other fields for graduating tokens."""
     if not updates:
         return  # No updates to process
-    
+
     try:
-        conn = sqlite3.connect(GRADUATING)
-        cursor = conn.cursor()
-        cursor.executemany("""
-            UPDATE graduating_tokens
-            SET marketCap = ?, volume = ?, pot_token = ?, liquidity = ?, trade = ?, degen = ?, ath = ?
-            WHERE token_address = ?
-        """, updates)
-        conn.commit()
-        conn.close()
+        async with aiosqlite.connect(DATABASE_NAME) as conn:
+            await conn.executemany("""
+                UPDATE tokens
+                SET marketCap = ?, volume = ?, pot_token = ?, liquidity = ?, trade = ?, degen = ?, ath = ?
+                WHERE token_address = ?
+            """, updates)
+            await conn.commit()
+        
         logger.info(f"✅ Batch update successful for {len(updates)} tokens")
     except Exception as e:
         logger.error(f"❌ Batch update error: {e}")
 
-
-def delete_graduating_token(token_address):
-    """Delete a token from the graduating database."""
+#-----------------------------------------------------
+"""
+async def delete_graduating_token(token_address):
+     #Delete a token from the graduating status in tokens.db.
     try:
-        conn = sqlite3.connect(GRADUATING)
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM graduating_tokens WHERE token_address = ?", (token_address,))
-        conn.commit()
-        conn.close()
-        logger.info(f"🗑️ Deleted {token_address} from graduating_db")
+        async with aiosqlite.connect(DATABASE_NAME) as conn:
+            await conn.execute("DELETE FROM tokens WHERE token_address = ?", (token_address,))
+            await conn.commit()
+        
+        logger.info(f"🗑️ Deleted {token_address} from tokens.db")
     except Exception as e:
         logger.error(f"❌ Error deleting token {token_address}: {e}")
-
+"""
 #----------------------------------------------------
 #Below is the updated code for the file database_name
 
