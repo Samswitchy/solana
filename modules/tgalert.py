@@ -1,14 +1,13 @@
 import requests
 
-TELEGRAM_BOT_TOKEN = "your_bot_token"
-TELEGRAM_CHAT_ID = "your_chat_id"
+TELEGRAM_BOT_TOKEN = "8135086500:AAE1_rsvbIHr17i3z3El2oMGnfqx1gnZfjw"
+TELEGRAM_CHAT_ID = "5833017299"
 
 def send_telegram_alert(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
-    requests.post(url, data=data)
+    response = requests.post(url, data=data)
+    #print(response.status_code, response.json())  # Print API response
 
-# Inside analyze_wash_trading():
-if suspicious_wallets or suspicious_times or suspicious_pairs:
-    alert_message = f"🚨 Wash trading detected for {contract_address}!\nWallets: {suspicious_wallets}"
-    send_telegram_alert(alert_message)
+#send_telegram_alert("Test message from my bot!")
+#send_telegram_alert()

@@ -3,15 +3,16 @@ import logging
 import asyncio
 import time
 from modules.database import get_all_tokens, holders_to_db  # ✅ Import holders_to_db
+#from modules.holders2 import get_holders_count  # ✅ Import function from holders2.py
 from modules.holders2 import get_holders_count  # ✅ Import function from holders2.py
 
 logger = logging.getLogger(__name__)
 
 
-semaphore = asyncio.Semaphore(3)  # Limit concurrent API calls
+semaphore = asyncio.Semaphore(2)  # Limit concurrent API calls
 cache = {}  # Cache to store API responses
 
-async def fetch_json(url, retries=5, delay=2):
+async def fetch_json(url, retries=4, delay=2):
     """Fetch JSON data with exponential backoff, rate limiting, and caching."""
     async with semaphore:
         for attempt in range(retries):
@@ -34,16 +35,22 @@ async def fetch_json(url, retries=5, delay=2):
 async def get_token_data(token_address):
     """Fetch market cap data with caching."""
     if token_address in cache and time.time() - cache[token_address]["timestamp"] < 60:
-        return cache[token_address]["marketCap"]  # Use cached data if less than 60s old
+       # logger.info(f"🟢 Using cached marketCap for {token_address}: {cache[token_address]}")
+        return cache[token_address].get("marketCap", 0)  # Safer cache access
 
     url = f"https://api.dexscreener.com/latest/dex/tokens/{token_address}"
     data = await fetch_json(url)
+
+    #logger.info(f"🔍 API Response for {token_address}: {data}")  # Log response
 
     if data and "pairs" in data and isinstance(data["pairs"], list) and len(data["pairs"]) > 0:
         market_cap = float(data["pairs"][0].get("marketCap", 0))
         cache[token_address] = {"marketCap": market_cap, "timestamp": time.time()}
         return market_cap
-    return 0
+
+    logger.warning(f"⚠️ No valid marketCap data found for {token_address}.")
+    return 0  # Explicitly return 0 instead of an unexpected value
+
 
 async def get_volume_data(token_address):
     """Fetch 24h trading volume across all DEX pairs asynchronously."""

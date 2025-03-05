@@ -52,6 +52,33 @@ async def enable_wal_mode():
 
 #--------------------------------------------------------
 
+async def initialize_database():
+    async with aiosqlite.connect(GRADUATING) as db:  # ✅ Use the same DB file
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS graduating_tokens (
+                token_address TEXT PRIMARY KEY,
+                twitter_link TEXT,
+                risk_score TEXT DEFAULT 'Unknown',
+                marketCap REAL,
+                ath Real,
+                trade TEXT,
+                liquidity REAL DEFAULT 0,   
+                holders INTEGER DEFAULT 0,
+                volume REAL DEFAULT 0,
+                degen REAL DEFAULT 0,
+                pot_token TEXT DEFAULT NULL,
+                added_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.commit()
+
+
+"""
+async def move_to_graduating_db(token_address, marketCap):
+    #Move token to graduating DB and set pot_token if market cap > 140K.
+    pot_token = "YES" if marketCap >= 140000 else "NO"  # ✅ Store "NO" instead of None
+"""
+
 async def move_to_graduating_db(token_address, marketCap):
     #from modules.volume_trend import get_volume_trend 
     """Move token to graduating DB and set pot_token if market cap > 140K."""
@@ -77,6 +104,14 @@ async def move_to_graduating_db(token_address, marketCap):
     await asyncio.sleep(0)  # ✅ Prevents deadlocks by allowing other tasks to run
 
     logger.info(f"✅ {token_address} saved/updated in graduating_db with marketCap: {marketCap}")
+
+async def get_previous_marketCap(token_address):
+    """Fetch the last stored market cap from the database asynchronously."""
+    async with aiosqlite.connect(DATABASE_NAME) as conn:
+        async with conn.execute("SELECT cur_marketCap FROM tokens WHERE token_address = ?", (token_address,)) as cursor:
+            result = await cursor.fetchone()
+
+    return result[0] if result else None
 
 
 async def fetch_graduating_tokens():
@@ -130,16 +165,6 @@ def delete_graduating_token(token_address):
     except Exception as e:
         logger.error(f"❌ Error deleting token {token_address}: {e}")
 
-#----------------------------------------------------
-#Below is the updated code for the file database_name
-
-async def get_previous_marketCap(token_address):
-    """Fetch the last stored market cap from the database asynchronously."""
-    async with aiosqlite.connect(DATABASE_NAME) as conn:
-        async with conn.execute("SELECT cur_marketCap FROM tokens WHERE token_address = ?", (token_address,)) as cursor:
-            result = await cursor.fetchone()
-
-    return result[0] if result else None
 
 async def save_to_db(token_name, token_address, twitter_link, int_marketCap, marketCap):
     """Asynchronously save token data to database."""
@@ -156,25 +181,32 @@ async def save_to_db(token_name, token_address, twitter_link, int_marketCap, mar
     except Exception as e:
         logger.error(f"❌ Database Error in save to db: {e}")
 
-async def calculate_risk(marketCap, volume):
+
+def calculate_risk(marketCap, volume):
     """Calculate risk score based on market cap and volume."""
     try:
-        marketCap, volume = float(marketCap), float(volume)
+        marketCap = float(marketCap)  # ✅ Ensure marketCap is a float
+        volume = float(volume)        # ✅ Ensure volume is a float
+
         if marketCap >= 50000 and volume >= 10000:
             return "High Risk"
         elif marketCap >= 30000:
             return "Medium Risk"
-        return "Low Risk"
+        else:
+            return "Low Risk"
     except ValueError:
-        return "Invalid Data"
+        return "Invalid Data"  # ✅ Handles non-numeric values safely
+
 
 async def market_to_db(token_address, marketCap, volume):
-    """Asynchronously update marketCap, volume, and risk_score."""
+    """Asynchronously update MarketCap, Volume, and Risk Score."""
     updated_at = datetime.datetime.utcnow().isoformat()
-    risk_score = await calculate_risk(marketCap, volume)
+    risk_score = calculate_risk(marketCap, volume)
+
     try:
         async with aiosqlite.connect(DATABASE_NAME) as conn:
-            await conn.execute("""
+            await conn.execute(
+                """
                 INSERT INTO tokens (token_address, marketCap, volume, risk_score, updated_at)
                 VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(token_address) DO UPDATE 
@@ -182,35 +214,60 @@ async def market_to_db(token_address, marketCap, volume):
                     volume = excluded.volume, 
                     risk_score = excluded.risk_score, 
                     updated_at = excluded.updated_at;
-            """, (token_address, marketCap, volume, risk_score, updated_at))
+                """,
+                (token_address, marketCap, volume, risk_score, updated_at)
+            )
             await conn.commit()
+        
         logger.info(f"✅ {token_address} updated: MarketCap: {marketCap}, Risk: {risk_score}")
+    
     except Exception as e:
         logger.error(f"❌ Error updating market cap for {token_address}: {e}")
 
-
-async def get_market_caps_from_db(token_address):
-    """Fetch int_marketCap, marketCap, and timestamps for a token from the database."""
-    async with aiosqlite.connect(DATABASE_NAME) as conn:
-        cursor = await conn.execute(
-            "SELECT int_marketCap, marketCap, initial_at, updated_at FROM tokens WHERE token_address = ?",
-            (token_address,)
-        )
-        result = await cursor.fetchone()
-    return result if result else (None, None, None, None)
+   # print(f"✅ {token_address} updated: MarketCap: {marketCap}, Risk: {risk_score}")
 
 
-async def holders_to_db(token_address, holders):
+def get_market_caps_from_db(token_address):
+    """Fetch int_marketCap, marketCap, and timestamp for a token from the database."""
+    conn = sqlite3.connect(DATABASE_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT int_marketCap, marketCap, initial_at, updated_at FROM tokens WHERE token_address = ?",
+        (token_address,)
+    )
+    
+    result = cursor.fetchone()  # Fetch the row
+    conn.close()
+
+    if result:
+        return result  # Returns (int_marketCap, marketCap, updated_at)
+    else:
+        return (None, None, None, None)  # Return None if no data found
+
+import sqlite3
+
+DB_FILE = "tokens.db"  # Change this to your actual database file
+
+def holders_to_db(token_address, holders):
     """Update the holders count in the database for a given token."""
     try:
-        async with aiosqlite.connect(DATABASE_NAME) as conn:
-            await conn.execute("""
-                UPDATE tokens SET holders = ? WHERE token_address = ?
-            """, (holders, token_address))
-            await conn.commit()
-        logger.info(f"✅ Holders count updated for {token_address}: {holders}")
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "UPDATE tokens SET holders = ? WHERE token_address = ?",
+            (holders, token_address),
+        )
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Holders count updated for {token_address}: {holders}")
+
     except Exception as e:
-        logger.error(f"❌ Error updating holders count: {e}")
+        print(f"❌ Error updating holders count: {e}")
+
 
 async def get_all_tokens():
     async with aiosqlite.connect(DATABASE_NAME) as conn:

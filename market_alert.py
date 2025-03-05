@@ -36,7 +36,8 @@ async def track_market(token_address):
            
             # Ignore tokens below 30K
             if marketCap < 30000:
-                logger.warning(f"🚫 Ignoring {token_address} (MarketCap: ${format_number(marketCap)}) - Too Low")
+                 # Remove the logging statement or comment it out
+                #logger.warning(f"🚫 Ignoring {token_address} (MarketCap: ${format_number(marketCap)}) - Too Low")
                 await asyncio.sleep(40)
                 continue  # Skip tracking this token
 
@@ -57,78 +58,59 @@ async def track_market(token_address):
         await asyncio.sleep(40)  # Check every 40 seconds
 
 
-import asyncio
-import logging
-
-logger = logging.getLogger(__name__)
-
 async def track_graduating_tokens():
     """Track tokens already in graduating.db and update their market cap."""
     while True:
         try:
-            tokens = await fetch_graduating_tokens()  # ✅ Use async function
+            tokens = await fetch_graduating_tokens()  # ✅ Ensure it returns prev_ath & prev_marketCap
 
             if tokens:
                 updates = []
                 for token_address, prev_marketCap, prev_ath in tokens:
-                    new_marketCap = await get_token_data(token_address)
-                    new_volume = await get_volume_data(token_address)
-                    new_liquidity = await get_liquidity_data(token_address)
+                    new_marketCap = await get_token_data(token_address) or "Not Available"
+                    new_volume = await get_volume_data(token_address) or 0
+                    new_liquidity = await get_liquidity_data(token_address) or 0
+
 
                     if new_marketCap != "Not Available":
                         new_marketCap = float(new_marketCap)
 
-                        # ✅ Classify degen level
-                        degen_classification = await classify_degen(token_address)
+                        # ✅ Ensure ATH updates correctly
+                        new_ath = max(prev_ath or 0, new_marketCap)
 
-                        # ✅ Store marketCap in 'degen' column if ≥ 100K
+                        # ✅ Classify token
                         degen = new_marketCap if new_marketCap >= 100000 else 0
+
+                        # ✅ Set trade condition
+                        # ✅ Update `pot_token` if marketCap is between 55K and 70K
+                        pot_token = new_marketCap if 55000 <= new_marketCap <= 70000 else "NO"
                         
-                        #ath = new_marketCap
+                        liquidity_status = new_liquidity if new_liquidity >= 20000 else "NO"
 
+                        trade = "BUY" if 58000 <= new_marketCap <= 70000 and liquidity_status != "NO" else "HOLD"
 
-                          # ✅ Update ATH (All-Time High) only if new_marketCap is greater
-                        new_ath = max(prev_ath, new_marketCap) if prev_ath else new_marketCap
-
-                        # ✅ Conditions for pot_token, liquidity, and trade
-                        pot_token = 61000 if new_marketCap >= 61000 else "NO"
-                        liquidity = new_liquidity if new_liquidity >= 20000 else "NO"
-                        trade = "BUY" if 58000 <= new_marketCap <= 70000 and liquidity != "NO" else "HOLD"
-
-                        if new_marketCap > prev_marketCap:
-                            #updates.append((new_marketCap, new_volume, pot_token, liquidity, degen, trade, token_address))
+                        if new_marketCap > prev_marketCap or new_marketCap >= 55000:
                             updates.append((
-                            new_marketCap,  # ✅ marketCap
-                            new_volume,     # ✅ volume
-                            pot_token,      # ✅ pot_token
-                            liquidity,      # ✅ liquidity
-                            trade,          # ✅ trade (before degen)
-                            degen,          # ✅ degen (last before token_address)
-                            new_ath, 
-                            token_address   # ✅ token_address (WHERE condition)
-                        ))
+                                new_marketCap, new_volume, pot_token, 
+                                liquidity_status, trade, degen, new_ath, token_address
+                            ))
 
-
-                            
-
-                        elif new_marketCap < 55000:  # Remove if below 58K
-                            logger.warning(f"⚠️ {token_address} dropped below 58K! Removing from graduating_db.")
-                            delete_graduating_token(token_address)
+                        elif new_marketCap < 53000:
+                            logger.warning(f"⚠️ {token_address} dropped below 55K! Removing from graduating_db.")
+                            await delete_graduating_token(token_address)  # ✅ Ensure it's awaited
 
                 if updates:
                     try:
-                        await batch_update_graduating_tokens(updates)  # ✅ Properly await async function
-
+                        await batch_update_graduating_tokens(updates)  # ✅ Awaiting the update
                         logger.info(f"✅ Successfully updated {len(updates)} graduating tokens.")
                     except Exception as e:
                         logger.error(f"❌ Failed to update graduating tokens: {e}")
 
-            await asyncio.sleep(30)  # ✅ Check every 30 seconds
+            await asyncio.sleep(20)
 
         except Exception as e:
             logger.error(f"❌ Error in track_graduating_tokens: {e}")
-            await asyncio.sleep(10)  # Wait 10s before retrying in case of failure
-
+            await asyncio.sleep(10)  # Retry after 10s
 
 async def track_multiple_tokens():
     """Continuously fetch market data for newly added tokens."""
@@ -151,7 +133,7 @@ async def track_multiple_tokens():
                 tracked_tasks[token_address] = asyncio.create_task(track_market(token_address))
                 logger.info(f"🚀 Started tracking {token_address}")
 
-        await asyncio.sleep(80)  # ✅ Refresh token list every 80 seconds
+        await asyncio.sleep(40)  # ✅ Refresh token list every 80 seconds
 
 async def classify_all_tokens():
     """Fetch token data and classify each token"""
