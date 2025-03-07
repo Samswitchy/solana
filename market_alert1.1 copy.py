@@ -1,17 +1,17 @@
 import asyncio
 import logging
-import datetime
 from modules.core.format import format_number
 from modules.filters import classify_degen
+from modules.database import get_all_tokens
 from modules.database import (
     market_to_db,
     get_all_tokens,
     move_to_graduating_db,
     fetch_graduating_tokens,
-    batch_update_tokens,
-    inactive_to_db,
-    delete_graduating_token
+    batch_update_graduating_tokens,
+    delete_graduating_token,
 )
+from modules.market_data import get_token_data, get_volume_data, get_liquidity_data
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,6 @@ from modules.market_data import (
     get_token_data, get_holders_data, 
     get_volume_data ,
     get_holders_data,
-    get_liquidity_data
  ) # ✅ Import holders & volume functions
 #from trade.bmain import buy_tokens_if_needed
 
@@ -38,23 +37,17 @@ async def track_market(token_address):
             # Ignore tokens below 30K
             if marketCap < 30000:
                  # Remove the logging statement or comment it out
+                #logger.warning(f"🚫 Ignoring {token_address} (MarketCap: ${format_number(marketCap)}) - Too Low")
                 await asyncio.sleep(40)
                 continue  # Skip tracking this token
 
-            status= "Active"
-
             logger.info(f"💰 {token_address} - MarketCap: ${format_number(marketCap)}, Volume: {format_number(volume)}")
-            
-            await market_to_db(token_address, marketCap, volume, liquidity)
+            await market_to_db(token_address, marketCap, volume)
 
 
-            if marketCap >= 57000:
-                status = "Graduating"
-                logger.info(f"🎓 {token_address} has crossed 57K! Moving to graduating_db")
-                await move_to_graduating_db(token_address, marketCap, status)  # ✅ Move to graduating DB
-                #await market_to_db(token_address, marketCap, volume, liquidity)
-                
-
+            if marketCap >= 62000:
+                logger.info(f"🎓 {token_address} has crossed 60K! Moving to graduating_db")
+                await move_to_graduating_db(token_address, marketCap)  # ✅ Move to graduating DB
                 # 🔥 Apply Degen Classification
                 degen_category = await classify_degen(token_address)
                 logger.info(f"🛠️ {token_address} classified as: {degen_category}")  # ✅ Log classification
@@ -70,7 +63,6 @@ async def track_graduating_tokens():
     while True:
         try:
             tokens = await fetch_graduating_tokens()  # ✅ Ensure it returns prev_ath & prev_marketCap
-            #logger.info(f" here Fetched {len(tokens)} graduating tokens: {tokens}")
 
             if tokens:
                 updates = []
@@ -94,34 +86,22 @@ async def track_graduating_tokens():
                         pot_token = new_marketCap if 55000 <= new_marketCap <= 70000 else "NO"
                         
                         liquidity_status = new_liquidity if new_liquidity >= 20000 else "NO"
-                        
-                        ath_at = datetime.datetime.utcnow().isoformat()
 
                         trade = "BUY" if 58000 <= new_marketCap <= 70000 and liquidity_status != "NO" else "HOLD"
 
                         if new_marketCap > prev_marketCap or new_marketCap >= 55000:
                             updates.append((
-                                new_marketCap,
-                                new_volume, 
-                                pot_token, 
-                                liquidity_status, 
-                                trade, 
-                                degen, 
-                                new_ath, 
-                                ath_at,
-                                token_address
+                                new_marketCap, new_volume, pot_token, 
+                                liquidity_status, trade, degen, new_ath, token_address
                             ))
-                        elif new_marketCap < 13000:  # ✅ If below 10K, delete from graduating DB
-                            logger.warning(f"🚨 {token_address}Token below 15K! Deleting from DB.")
-                            #await delete_graduating_token(token_address)  # ✅ Ensure it's awaited
-                        elif new_marketCap < 25000:
-                            status = "Inactive"
-                            logger.warning(f"⚠️ {token_address}Token below 25K! Inactive in Status.")
-                            await inactive_to_db(token_address,status)  # ✅ Ensure it's awaited
-                    
+
+                        elif new_marketCap < 20000:
+                            logger.warning(f"⚠️ {token_address} dropped below 55K! Removing from graduating_db.")
+                            await delete_graduating_token(token_address)  # ✅ Ensure it's awaited
+
                 if updates:
                     try:
-                        await batch_update_tokens(updates)  # ✅ Awaiting the update
+                        await batch_update_graduating_tokens(updates)  # ✅ Awaiting the update
                         logger.info(f"✅ Successfully updated {len(updates)} graduating tokens.")
                     except Exception as e:
                         logger.error(f"❌ Failed to update graduating tokens: {e}")
@@ -153,7 +133,7 @@ async def track_multiple_tokens():
                 tracked_tasks[token_address] = asyncio.create_task(track_market(token_address))
                 logger.info(f"🚀 Started tracking {token_address}")
 
-        await asyncio.sleep(30)  # ✅ Refresh token list every 80 seconds
+        await asyncio.sleep(40)  # ✅ Refresh token list every 80 seconds
 
 async def classify_all_tokens():
     """Fetch token data and classify each token"""

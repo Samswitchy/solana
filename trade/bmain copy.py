@@ -6,8 +6,6 @@ from abuy import buy_token
   
 SOL_MINT = "So11111111111111111111111111111111111111112"
 COOLDOWN_PERIOD = 3600  # 1 hour cooldown before rebuying the same token
-STOP_LOSS_PERCENT = 30  # Stop-loss at 30% below entry price
-
 
 def buy_tokens_if_needed():
     """Checks tokens in DB and buys if trade = 'BUY'."""
@@ -28,7 +26,6 @@ def buy_tokens_if_needed():
 
             print(f"🔍 Checking Token: {TOKEN_MINT}, Pot_token: {POT_TOKEN}, Stored MarketCap: {DB_MARKETCAP}, Trade: {TRADE}")
 
-            #if TRADE == "BUY":
             if TRADE == "BUY":
                 price, market_cap = get_token_marketcap(TOKEN_MINT)
                 print(f"🔹 Live MarketCap: {market_cap}")
@@ -41,14 +38,6 @@ def buy_tokens_if_needed():
                     if txid and expected_tokens is not None:
                         print(f"✅ Swap successful! Tx ID: {txid}")
                         print(f"🔹 You received ~{expected_tokens} tokens")
-
-                         # ✅ Calculate initial stop-loss price
-                        stop_loss_price = price * (1 - STOP_LOSS_PERCENT / 100)
-
-                        # ✅ Save token with stop-loss price
-                        save_bought_token(TOKEN_MINT, expected_tokens, txid, price, market_cap, stop_loss_price)
-
-                        print(f"🔹 Initial Stop-Loss set at: {stop_loss_price} SOL")
 
                         save_bought_token(TOKEN_MINT, expected_tokens, txid, price, market_cap)
                         break  # ✅ Stop checking once a token is bought

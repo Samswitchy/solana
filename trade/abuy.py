@@ -38,7 +38,7 @@ def buy_token(input_mint: str, output_mint: str, sol_amount: float = 0.01, prior
             print("❌ Error: One or both token mint addresses are incorrect.")
         elif "rate limit" in error_message:
             print("❌ Error: API rate limit exceeded. Try again later.")
-        else:
+        else: 
             print(f"❌ Unknown error: {error_message}")
 
         return None, None  # Exit early if an error is detected

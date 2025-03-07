@@ -1,67 +1,55 @@
-import asyncio
-import logging
-from modules.database import get_all_tokens, market_to_db, move_to_graduating_db  # Fetch token addresses
-from modules.market_data import get_token_data, get_volume_data, get_liquidity_data  # Fetch market data
+import requests
+import pandas as pd
+import numpy as np
+import talib
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-def format_number(num):
-    return f"{num:,.2f}" if num is not None else "N/A"
-
-async def track_market(token_address):
-    """Fetch MarketCap, volume, and liquidity and update the database continuously."""
-    while True:
-        try:
-            token_data = await get_token_data(token_address)
-            marketCap = token_data.get("marketCap", 0)
-
-            volume = await get_volume_data(token_address)
-            liquidity = await get_liquidity_data(token_address)
-            logger.info(f"🔍 Raw marketCap response for {token_address}: {marketCap}")
-
-            if isinstance(marketCap, str):
-                try:
-                    marketCap = float(marketCap.replace(",", ""))
-                except ValueError:
-                    logger.error(f"Invalid marketCap value: {marketCap}")
-                    marketCap = None
-
-            if not marketCap or marketCap < 30000:
-                logger.warning(f"🚫 Ignoring {token_address} (MarketCap: ${format_number(marketCap)}) - Too Low")
-                await asyncio.sleep(40)
-                continue  
-
-            logger.info(f"💰 {token_address} - MarketCap: ${format_number(marketCap)}, Volume: {format_number(volume)}")
-            await market_to_db(token_address, marketCap, volume)
-
-            if marketCap >= 65000:
-                logger.info(f"🎓 {token_address} has crossed 60K! Moving to graduating_db")
-                await move_to_graduating_db(token_address, marketCap)
-
-            if liquidity < 10_000:
-                logger.warning(f"⚠️ Low Liquidity: ${format_number(liquidity)}")
-            else:
-                logger.info(f"✅ Total Liquidity: ${format_number(liquidity)}")
-
-        except asyncio.CancelledError:
-            logger.info(f"🛑 Task cancelled for {token_address}")
-            break
-        except Exception as e:
-            logger.error(f"❌ Error tracking {token_address}: {e}")
-
-        await asyncio.sleep(40)  # Wait before next update
-
-async def track_all_tokens():
-    """Fetch all tokens and start tracking market data for each."""
-    tokens = await get_all_tokens()
+# Function to fetch real-time price data from Jupiter API
+def fetch_price_data(token_address, limit=50):
+    url = f"https://price.jup.ag/v4/price?ids={token_address}"
+    response = requests.get(url).json()
     
-    if not tokens:
-        logger.warning("⚠️ No tokens found in the database.")
-        return
+    if token_address in response['data']:
+        price = response['data'][token_address]['price']
+        return price
+    else:
+        print("Error fetching price data.")
+        return None
 
-    tasks = [track_market(token["token_address"]) for token in tokens]
-    await asyncio.gather(*tasks)
+# Function to calculate RSI
+def calculate_rsi(prices, period=14):
+    prices = np.array(prices, dtype=float)
+    rsi = talib.RSI(prices, timeperiod=period)
+    return rsi[-1] if len(rsi) > 0 else None
 
-if __name__ == "__main__":
-    asyncio.run(track_all_tokens())
+# Function to calculate Bollinger Bands
+def calculate_bollinger_bands(prices, period=20, std_dev=2):
+    prices = np.array(prices, dtype=float)
+    upper, middle, lower = talib.BBANDS(prices, timeperiod=period, nbdevup=std_dev, nbdevdn=std_dev, matype=0)
+    return upper[-1], middle[-1], lower[-1]
+
+# Function to calculate Moving Averages
+def calculate_moving_average(prices, period=50):
+    prices = np.array(prices, dtype=float)
+    ma = talib.SMA(prices, timeperiod=period)
+    return ma[-1] if len(ma) > 0 else None
+
+# Example usage with dummy price data
+price_history = [fetch_price_data("2v8epm5mM8rXWiFysHccsfxPMcJbADyWkjT7Eb2dpump") for _ in range(50)]  # Fetching last 50 prices
+price_history = [p for p in price_history if p is not None]  # Remove None values
+
+if len(price_history) >= 20:
+    rsi_value = calculate_rsi(price_history)
+    upper_band, middle_band, lower_band = calculate_bollinger_bands(price_history)
+    moving_average = calculate_moving_average(price_history)
+    
+    print(f"RSI: {rsi_value}")
+    print(f"Bollinger Bands - Upper: {upper_band}, Middle: {middle_band}, Lower: {lower_band}")
+    print(f"Moving Average: {moving_average}")
+    
+    # Buy Signal Conditions
+    if rsi_value < 30 and price_history[-1] > lower_band and price_history[-1] > moving_average:
+        print("BUY SIGNAL TRIGGERED!")
+    else:
+        print("No buy signal yet.")
+else:
+    print("Not enough data to calculate indicators.")

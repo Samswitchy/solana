@@ -1,11 +1,7 @@
-from asell import sell_token
+#from market_monitor import monitor_market
+#from trade_manager import monitor_market
+from trade_manager import monitor_market
 
-# Example usage
-TOKEN_MINT = "Your_Token_Address_Here"
-txid, received_sol = sell_token(TOKEN_MINT, sol_amount=100)  # Selling 100 tokens
-
-if txid:
-    print(f"✅ Sold successfully! Tx ID: {txid}")
-    print(f"🔹 Received: {received_sol} SOL")
-else:
-    print("❌ Sell transaction failed.")
+if __name__ == "__main__":
+    print("🚀 Starting Market Monitoring for Selling...")
+    monitor_market()

@@ -35,6 +35,7 @@ def init_db():
             holders REAL,  -- ✅ New column for holders
             xmade REAL,  -- ✅ New column for number of x made      
             initial_at TEXT DEFAULT CURRENT_TIMESTAMP,  -- ✅ Stores when token was first added
+            ath_at TEXT DEFAULT NULL, -- Set when the current all time hits 
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP -- ✅ Store time when marketCap was updated
 
         )
@@ -56,6 +57,7 @@ async def enable_wal_mode():
 async def move_to_graduating_db(token_address, marketCap, status):
     pot_token = "NO"  # Initialize variable to avoid reference errors
     trade = "NO"
+    #if 55000 <= marketCap <= 70000:
     if 55000 <= marketCap <= 70000:
         pot_token = marketCap
         trade = "YES"
@@ -94,6 +96,8 @@ async def fetch_graduating_tokens():
 
 async def batch_update_tokens(updates):
     """Batch update market cap, volume, pot_token, and other fields for graduating tokens."""
+    
+
     if not updates:
         return  # No updates to process
 
@@ -101,7 +105,7 @@ async def batch_update_tokens(updates):
         async with aiosqlite.connect(DATABASE_NAME) as conn:
             await conn.executemany("""
                 UPDATE tokens
-                SET marketCap = ?, volume = ?, pot_token = ?, liquidity = ?, trade = ?, degen = ?, ath = ?
+                SET marketCap = ?, volume = ?, pot_token = ?, liquidity = ?, trade = ?, degen = ?, ath = ?, ath_at = ?
                 WHERE token_address = ?
             """, updates)
             await conn.commit()
@@ -160,9 +164,9 @@ async def save_to_db(token_name, token_address, twitter_link, int_marketCap, mar
         async with aiosqlite.connect(DATABASE_NAME) as conn:
             cursor = await conn.cursor()
             await cursor.execute("""
-                INSERT OR IGNORE INTO tokens (token_name, token_address, twitter_link, int_marketCap, marketCap) 
+                INSERT OR IGNORE INTO tokens (token_name, token_address, twitter_link, int_marketCap, marketCap, ath) 
                 VALUES (?, ?, ?, ?, ?)
-            """, (token_name, token_address, twitter_link, int_marketCap, marketCap))
+            """, (token_name, token_address, twitter_link, int_marketCap, marketCap, ath))
             await conn.commit()  # ✅ Use `await` for async commit
 
         logger.info(f"✅ Saved to DB: {token_name} - {token_address} - Market Cap: {int_marketCap} - Market: {marketCap}")

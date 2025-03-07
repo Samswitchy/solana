@@ -1,77 +1,62 @@
-import asyncio
-import logging
-from modules.core.format import format_number
-from modules.database import get_all_tokens, get_all_token_addresses  # Fetch token addresses
-from modules.market_data import get_token_data, get_volume_data, get_liquidity_data  # Fetch volume data
+import requests
+import numpy as np
+import talib
 
+# Function to fetch real-time price data from Jupiter API
+def fetch_price_data(token_address):
+    url = f"https://quote-api.jup.ag/v6/quote?inputMint={token_address}&outputMint=So11111111111111111111111111111111111111112&amount=1000000"
+    try:
+        response = requests.get(url).json()
+        
+        if "outAmount" in response:
+            price = float(response["outAmount"]) / 1e9  # Convert lamports to SOL
+            return price
+        else:
+            print("Error fetching price data.")
+            return None
+    except Exception as e:
+        print(f"Request failed: {e}")
+        return None
 
-logger = logging.getLogger(__name__)
+# Function to calculate RSI
+def calculate_rsi(prices, period=14):
+    prices = np.array(prices, dtype=float)
+    rsi = talib.RSI(prices, timeperiod=period)
+    return rsi[-1] if len(rsi) > 0 else None
 
-async def track_market():
-    """Fetch MarketCap, holders, and volume for multiple tokens from DB and update separately."""
-    while True:
-        token_address = await get_all_token_addresses()  # ✅ Fetch tokens from database
+# Function to calculate Bollinger Bands
+def calculate_bollinger_bands(prices, period=20, std_dev=2):
+    prices = np.array(prices, dtype=float)
+    upper, middle, lower = talib.BBANDS(prices, timeperiod=period, nbdevup=std_dev, nbdevdn=std_dev, matype=0)
+    return upper[-1], middle[-1], lower[-1]
 
-        if not token_address:
-            logger.warning("No tokens found in database. Retrying...")
-            await asyncio.sleep(60)  # Wait before retrying
-            continue
+# Function to calculate Moving Averages
+def calculate_moving_average(prices, period=50):
+    prices = np.array(prices, dtype=float)
+    ma = talib.SMA(prices, timeperiod=period)
+    return ma[-1] if len(ma) > 0 else None
 
-        # ✅ Batch API Calls - Fetch Data for ALL tokens at once
-        marketCaps = await get_token_data(token_address)  
-        volumes = await get_volume_data(token_address)  
-        liquidities = await get_liquidity_data(token_address)  
+# Token Address (Replace with your token's address)
+token_address = "5dyma5yb1tqyxkctowbbvq6ahhyvr3jyxyn5k7wpplkq"
 
-        tasks = []  # Store async tasks
+# Fetch historical price data
+price_history = [fetch_price_data(token_address) for _ in range(50)]  # Fetch last 50 prices
+price_history = [p for p in price_history if p is not None]  # Remove None values
 
-        for token in token_address:
-            tasks.append(asyncio.create_task(process_token(token, marketCaps, volumes, liquidities)))
-
-        # ✅ Run all token updates in parallel
-        await asyncio.gather(*tasks)
-
-        await asyncio.sleep(40)  # Re-check every 40 seconds
-
-async def process_token(token_address, marketCaps, volumes, liquidities):
-    """Processes each token individually by calling modular functions."""
-    marketCap = marketCaps.get(token_address, "Not Available")
-    volume = volumes.get(token_address, 0)
-    liquidity = liquidities.get(token_address, 0)
-
-    if marketCap == "Not Available" or float(marketCap) < 30000:
-        return  # Skip low-market-cap tokens
-
-    await save_to_db(token_address, marketCap, volume, liquidity)
-    await check_graduation(token_address, marketCap)
-    await log_and_notify(token_address, marketCap, volume, liquidity)
-
-async def save_to_db(token_address, marketCap, volume, liquidity):
-    """Handles database updates separately."""
-    from modules.database import market_to_db  # ✅ Import only when needed to avoid circular imports
-    await market_to_db(token_address, marketCap, volume, liquidity)
-
-async def check_graduation(token_address, marketCap):
-    """Handles logic for graduation to the next tier."""
-    if float(marketCap) >= 57000:
-        status = "Graduating"
-        logger.info(f"🎓 {token_address} has crossed 60K! Moving to graduating_db")
-        from modules.database import move_to_graduating_db
-        await move_to_graduating_db(token_address, marketCap, status)
-
-        # Apply degen classification
-        from modules.filters import classify_degen  # ✅ Import classification function
-        degen_category = await classify_degen(token_address)
-        logger.info(f"🛠️ {token_address} classified as: {degen_category}")
-
-async def log_and_notify(token_address, marketCap, volume, liquidity):
-    """Handles logging and notifications separately."""
-    logger.info(f"💰 {token_address} - MarketCap: ${format_number(marketCap)}, Volume: {format_number(volume)}")
-
-    if liquidity < 10_000:
-        print(f"⚠️ {token_address} - Low Liquidity: ${format_number(liquidity)}")
+# Check if enough data is available to calculate indicators
+if len(price_history) >= 20:
+    rsi_value = calculate_rsi(price_history)
+    upper_band, middle_band, lower_band = calculate_bollinger_bands(price_history)
+    moving_average = calculate_moving_average(price_history)
+    
+    print(f"RSI: {rsi_value}")
+    print(f"Bollinger Bands - Upper: {upper_band}, Middle: {middle_band}, Lower: {lower_band}")
+    print(f"Moving Average: {moving_average}")
+    
+    # **Buy Signal Conditions**
+    if rsi_value < 30 and price_history[-1] > lower_band and price_history[-1] > moving_average:
+        print("✅ BUY SIGNAL TRIGGERED!")
     else:
-        print(f"✅ {token_address} - Total Liquidity: ${format_number(liquidity)}")
-
-if __name__ == "__main__":
-    asyncio.run(track_market())  # ✅ Starts tracking market data
-
+        print("❌ No buy signal yet.")
+else:
+    print("⚠️ Not enough data to calculate indicators.")

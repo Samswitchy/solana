@@ -1,35 +1,27 @@
 import sqlite3
 
-def update_database_schema(db_name, table_name):
-    """Ensure the database has the required columns and update existing records with default values."""
+def add_ath_at_column(db_name, table_name):
+    """Add the 'ath_at' column if it does not exist and update existing rows with timestamps."""
     conn = sqlite3.connect(db_name)
     cursor = conn.cursor()
 
-    # List of columns to add (column_name, type, default_value)
-    columns = [
-        ("ath", "REAL", 0),
-        ("liquidity", "REAL", None),  # No default value
-        ("status", "TEXT", "active"),
-        ("trade", "TEXT", "HOLD")
-    ]
-
-    # Get existing columns
+    # Check if 'ath_at' column exists
     cursor.execute(f"PRAGMA table_info({table_name})")
     existing_columns = {row[1] for row in cursor.fetchall()}
 
-    # Add missing columns
-    for col_name, col_type, default in columns:
-        if col_name not in existing_columns:
-            cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
+    if "ath_at" not in existing_columns:
+        # Add column WITHOUT DEFAULT (SQLite restriction)
+        cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN ath_at TEXT")
+        # Update existing rows with CURRENT_TIMESTAMP
+        #cursor.execute(f"UPDATE {table_name} SET ath_at = CURRENT_TIMESTAMP WHERE ath_at IS NULL")
+        cursor.execute(f"UPDATE {table_name} SET ath_at = NULL WHERE ath_at IS NULL")
+        
+        conn.commit()
+        print(f"✅ Column 'ath_at' added successfully and existing rows updated.")
+    else:
+        print(f"⚠️ Column 'ath_at' already exists. No changes made.")
 
-    # Ensure existing rows have default values
-    for col_name, col_type, default in columns:
-        if default is not None:
-            cursor.execute(f"UPDATE {table_name} SET {col_name} = ? WHERE {col_name} IS NULL", (default,))
-
-    conn.commit()
     conn.close()
-    print(f"✅ Database '{db_name}' updated successfully!")
 
-# Example usage:
-update_database_schema("tokens.db", "tokens")
+# Example usage
+add_ath_at_column("tokens.db", "tokens")

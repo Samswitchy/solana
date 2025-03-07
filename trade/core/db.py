@@ -29,15 +29,24 @@ def create_table():
             amount REAL,
             tx_signature TEXT,
             market_price REAL,
-            market_cap REAL,
+            marketcap REAL,
             new_marketcap REAL,
             x_made TEXT,
             x_sold TEXT,
+            take_profit_x REAL DEFAULT 2.5,  -- Default 2.5x profit
+            stop_loss_x REAL DEFAULT 0.8,  -- Default 20% loss
+            status TEXT DEFAULT 'ACTIVE',  -- "ACTIVE", "SOLD", "STOPPED"
+            sell_tx_signature TEXT,  -- Sell transaction ID
+            sell_price REAL,  -- Price at which token was sold
+            stop_loss_price REAL,   -- New field for trailing stop-loss
+            take_profit_level REAL, -- New field for take-profit tracking
+            tokens_sold REAL DEFAULT 0, -- New field for tracking sold tokens
             bought_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-            
+                   
         )
     ''')
+
 
     conn.commit()
     conn.close()
@@ -62,20 +71,20 @@ def get_mint_address():
         print(f"Database error: {e}")
         return None
 
-def save_bought_token(mint, amount, tx_signature, price, market_cap):
-    """Saves token details when bought."""
-    try:
-        conn = sqlite3.connect(TRADE)
-        cursor = conn.cursor()
+def save_bought_token(token_address, amount, tx_signature, market_price, marketcap, stop_loss_price):
+    """Saves newly bought token details in the database with an initial stop-loss."""
+    conn = sqlite3.connect(TRADE)
+    cursor = conn.cursor()
 
-        cursor.execute('''
-            INSERT OR REPLACE INTO bought_tokens (token_address, amount, tx_signature, market_price, market_cap, new_marketcap)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (mint, amount, tx_signature, price, market_cap, market_cap))
+    cursor.execute('''
+        INSERT INTO bought_tokens (token_address, amount, tx_signature, market_price, marketcap, stop_loss_price, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE')
+    ''', (token_address, amount, tx_signature, market_price, marketcap, stop_loss_price))
 
-        conn.commit()
-        conn.close()
-        print(f"✅ Saved {mint} with price ${price} and market cap ${market_cap}.")
+    conn.commit()
+    conn.close()
+
+        print(f"✅ Saved {mint} with price ${market_price} and market cap ${market_cap}.")
     except sqlite3.Error as e:
         print(f"❌ Database error: {e}")
 
@@ -84,7 +93,8 @@ def fetch_info():
     try:
         conn = sqlite3.connect(DATABASE_NAME)
         cursor = conn.cursor()
-        cursor.execute("SELECT token_address, pot_token, marketcap, trade FROM tokens WHERE status = 'Graduating' ")
+        #cursor.execute("SELECT token_address, pot_token, marketcap, trade FROM tokens WHERE status = 'Graduating' ")
+        cursor.execute("SELECT token_address, pot_token, marketcap, trade FROM tokens WHERE status = 'Active' ")
         results = cursor.fetchall()  # ✅ Fetch all records
         conn.close()
         return results  # ✅ List of (TOKEN_MINT, POT_TOKEN, MARKETCAP) tuples

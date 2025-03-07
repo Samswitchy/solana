@@ -50,9 +50,12 @@ async def process_message(message_text):
             )
 
             int_marketCap = marketCap  # Convert marketCap to an integer if needed
+            
+            ath = marketCap
 
             logger.info(f"✅ Extracted Address: {token_address}")
             logger.info(f"✅ Extracted Market Cap: {marketCap}")
+            logger.info(f"✅ All-Time High (ATH): {ath}")
 
             if twitter_link:
                 logger.info(f"✅ Extracted X Link: {twitter_link}")
@@ -61,7 +64,7 @@ async def process_message(message_text):
             #await asyncio.to_thread(save_to_db, token_name, token_address, twitter_link, int_marketCap, marketCap)
             #await asyncio.to_thread(save_to_db, token_name, token_address, twitter_link, int_marketCap, marketCap)
              # ✅ Save to database asynchronously (NO NEED FOR `asyncio.to_thread`)
-            await save_to_db(token_name, token_address, twitter_link, int_marketCap, marketCap)
+            await save_to_db(token_name, token_address, twitter_link, int_marketCap, marketCap, ath)
 
     except Exception as e:
         logger.error(f"❌ Error in process_message: {e}")
